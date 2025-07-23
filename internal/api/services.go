@@ -80,6 +80,16 @@ func (s *Server) createServiceInNamespace(c *gin.Context, namespace string) {
 	}
 	
 	// Convert to storage resource
+	metadataJSON, err := json.Marshal(service.Metadata)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "SERIALIZATION_ERROR",
+			Message: "Failed to serialize service metadata",
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+	
 	specJSON, err := json.Marshal(service.Spec)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -105,6 +115,7 @@ func (s *Server) createServiceInNamespace(c *gin.Context, namespace string) {
 		Kind:      "Service",
 		Namespace: service.Metadata.Namespace,
 		Name:      service.Metadata.Name,
+		Metadata:  string(metadataJSON),
 		Spec:      string(specJSON),
 		Status:    string(statusJSON),
 		CreatedAt: now,
@@ -250,6 +261,16 @@ func (s *Server) updateServiceInNamespace(c *gin.Context, namespace string) {
 	service.Metadata.UpdatedAt = time.Now()
 	
 	// Convert to storage resource
+	metadataJSON, err := json.Marshal(service.Metadata)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "SERIALIZATION_ERROR",
+			Message: "Failed to serialize service metadata",
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+	
 	specJSON, err := json.Marshal(service.Spec)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -274,6 +295,7 @@ func (s *Server) updateServiceInNamespace(c *gin.Context, namespace string) {
 		Kind:      "Service",
 		Namespace: namespace,
 		Name:      name,
+		Metadata:  string(metadataJSON),
 		Spec:      string(specJSON),
 		Status:    string(statusJSON),
 	}
@@ -387,6 +409,11 @@ func (s *Server) listServicesInNamespace(c *gin.Context, namespace string) {
 
 // resourceToService converts a storage resource to a Service
 func (s *Server) resourceToService(resource storage.Resource) (*types.Service, error) {
+	var metadata types.ObjectMeta
+	if err := json.Unmarshal([]byte(resource.Metadata), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal service metadata: %w", err)
+	}
+	
 	var spec types.ServiceSpec
 	if err := json.Unmarshal([]byte(resource.Spec), &spec); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal service spec: %w", err)
@@ -402,15 +429,9 @@ func (s *Server) resourceToService(resource storage.Resource) (*types.Service, e
 	service := &types.Service{
 		APIVersion: "v1",
 		Kind:       "Service",
-		Metadata: types.ObjectMeta{
-			Name:      resource.Name,
-			Namespace: resource.Namespace,
-			UID:       resource.ID,
-			CreatedAt: resource.CreatedAt,
-			UpdatedAt: resource.UpdatedAt,
-		},
-		Spec:   spec,
-		Status: status,
+		Metadata:   metadata,
+		Spec:       spec,
+		Status:     status,
 	}
 	
 	return service, nil

@@ -4,8 +4,9 @@ CREATE TABLE IF NOT EXISTS resources (
     kind TEXT NOT NULL,
     namespace TEXT DEFAULT 'default',
     name TEXT NOT NULL,
-    spec TEXT NOT NULL,  -- JSON blob
-    status TEXT,         -- JSON blob
+    metadata TEXT DEFAULT '{}', -- JSON blob containing full metadata
+    spec TEXT NOT NULL,         -- JSON blob
+    status TEXT,                -- JSON blob
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(kind, namespace, name)

@@ -3,10 +3,16 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"mini-k8s-orchestration/pkg/types"
+)
+
+// Common errors
+var (
+	ErrResourceNotFound = errors.New("resource not found")
 )
 
 // Repository defines the interface for resource storage operations
@@ -40,6 +46,7 @@ type Resource struct {
 	Kind      string    `json:"kind"`
 	Namespace string    `json:"namespace"`
 	Name      string    `json:"name"`
+	Metadata  string    `json:"metadata"`  // JSON blob containing full metadata
 	Spec      string    `json:"spec"`      // JSON blob
 	Status    string    `json:"status"`    // JSON blob
 	CreatedAt time.Time `json:"createdAt"`
@@ -67,8 +74,8 @@ func NewSQLRepository(db *Database) Repository {
 // CreateResource creates a new resource
 func (r *SQLRepository) CreateResource(resource Resource) error {
 	query := `
-		INSERT INTO resources (id, kind, namespace, name, spec, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO resources (id, kind, namespace, name, metadata, spec, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
 	now := time.Now()
@@ -77,6 +84,7 @@ func (r *SQLRepository) CreateResource(resource Resource) error {
 		resource.Kind,
 		resource.Namespace,
 		resource.Name,
+		resource.Metadata,
 		resource.Spec,
 		resource.Status,
 		now,
@@ -93,7 +101,7 @@ func (r *SQLRepository) CreateResource(resource Resource) error {
 // GetResource retrieves a resource by kind, namespace, and name
 func (r *SQLRepository) GetResource(kind, namespace, name string) (Resource, error) {
 	query := `
-		SELECT id, kind, namespace, name, spec, status, created_at, updated_at
+		SELECT id, kind, namespace, name, metadata, spec, status, created_at, updated_at
 		FROM resources
 		WHERE kind = ? AND namespace = ? AND name = ?
 	`
@@ -104,6 +112,7 @@ func (r *SQLRepository) GetResource(kind, namespace, name string) (Resource, err
 		&resource.Kind,
 		&resource.Namespace,
 		&resource.Name,
+		&resource.Metadata,
 		&resource.Spec,
 		&resource.Status,
 		&resource.CreatedAt,
@@ -124,11 +133,12 @@ func (r *SQLRepository) GetResource(kind, namespace, name string) (Resource, err
 func (r *SQLRepository) UpdateResource(resource Resource) error {
 	query := `
 		UPDATE resources
-		SET spec = ?, status = ?, updated_at = ?
+		SET metadata = ?, spec = ?, status = ?, updated_at = ?
 		WHERE kind = ? AND namespace = ? AND name = ?
 	`
 	
 	result, err := r.db.DB().Exec(query,
+		resource.Metadata,
 		resource.Spec,
 		resource.Status,
 		time.Now(),
@@ -181,7 +191,7 @@ func (r *SQLRepository) ListResources(kind, namespace string) ([]Resource, error
 	
 	if namespace == "" {
 		query = `
-			SELECT id, kind, namespace, name, spec, status, created_at, updated_at
+			SELECT id, kind, namespace, name, metadata, spec, status, created_at, updated_at
 			FROM resources
 			WHERE kind = ?
 			ORDER BY created_at DESC
@@ -189,7 +199,7 @@ func (r *SQLRepository) ListResources(kind, namespace string) ([]Resource, error
 		args = []interface{}{kind}
 	} else {
 		query = `
-			SELECT id, kind, namespace, name, spec, status, created_at, updated_at
+			SELECT id, kind, namespace, name, metadata, spec, status, created_at, updated_at
 			FROM resources
 			WHERE kind = ? AND namespace = ?
 			ORDER BY created_at DESC
@@ -211,6 +221,7 @@ func (r *SQLRepository) ListResources(kind, namespace string) ([]Resource, error
 			&resource.Kind,
 			&resource.Namespace,
 			&resource.Name,
+			&resource.Metadata,
 			&resource.Spec,
 			&resource.Status,
 			&resource.CreatedAt,

@@ -16,6 +16,11 @@ type Server struct {
 	port       int
 }
 
+// Router returns the gin router for testing
+func (s *Server) Router() *gin.Engine {
+	return s.router
+}
+
 // NewServer creates a new API server
 func NewServer(repository storage.Repository, port int) *Server {
 	// Set Gin to release mode for production

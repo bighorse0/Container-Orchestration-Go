@@ -171,6 +171,7 @@ func TestGetPod(t *testing.T) {
 	}
 	
 	// Create via repository
+	metadataJSON, _ := json.Marshal(pod.Metadata)
 	specJSON, _ := json.Marshal(pod.Spec)
 	statusJSON, _ := json.Marshal(types.PodStatus{Phase: "Running"})
 	
@@ -179,6 +180,7 @@ func TestGetPod(t *testing.T) {
 		Kind:      "Pod",
 		Namespace: "default",
 		Name:      "test-pod",
+		Metadata:  string(metadataJSON),
 		Spec:      string(specJSON),
 		Status:    string(statusJSON),
 	}
@@ -246,6 +248,12 @@ func TestListPods(t *testing.T) {
 	// Create test pods
 	pods := []string{"pod1", "pod2", "pod3"}
 	for _, podName := range pods {
+		metadata := types.ObjectMeta{
+			Name:      podName,
+			Namespace: "default",
+		}
+		
+		metadataJSON, _ := json.Marshal(metadata)
 		specJSON, _ := json.Marshal(types.PodSpec{
 			Containers: []types.Container{
 				{Name: "nginx", Image: "nginx:latest"},
@@ -257,6 +265,7 @@ func TestListPods(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "default",
 			Name:      podName,
+			Metadata:  string(metadataJSON),
 			Spec:      string(specJSON),
 			Status:    `{"phase":"Running"}`,
 		}
@@ -547,6 +556,7 @@ func TestGetService(t *testing.T) {
 		},
 	}
 	
+	metadataJSON, _ := json.Marshal(service.Metadata)
 	specJSON, _ := json.Marshal(service.Spec)
 	statusJSON, _ := json.Marshal(types.ServiceStatus{})
 	
@@ -555,6 +565,7 @@ func TestGetService(t *testing.T) {
 		Kind:      "Service",
 		Namespace: "default",
 		Name:      "test-service",
+		Metadata:  string(metadataJSON),
 		Spec:      string(specJSON),
 		Status:    string(statusJSON),
 	}
@@ -593,6 +604,12 @@ func TestListServices(t *testing.T) {
 	// Create test services
 	services := []string{"service1", "service2"}
 	for _, serviceName := range services {
+		metadata := types.ObjectMeta{
+			Name:      serviceName,
+			Namespace: "default",
+		}
+		
+		metadataJSON, _ := json.Marshal(metadata)
 		specJSON, _ := json.Marshal(types.ServiceSpec{
 			Ports: []types.ServicePort{{Port: 80}},
 		})
@@ -602,6 +619,7 @@ func TestListServices(t *testing.T) {
 			Kind:      "Service",
 			Namespace: "default",
 			Name:      serviceName,
+			Metadata:  string(metadataJSON),
 			Spec:      string(specJSON),
 			Status:    `{}`,
 		}

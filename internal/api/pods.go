@@ -97,6 +97,16 @@ func (s *Server) createPodInNamespace(c *gin.Context, namespace string) {
 	}
 	
 	// Convert to storage resource
+	metadataJSON, err := json.Marshal(pod.Metadata)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "SERIALIZATION_ERROR",
+			Message: "Failed to serialize pod metadata",
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+	
 	specJSON, err := json.Marshal(pod.Spec)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -122,6 +132,7 @@ func (s *Server) createPodInNamespace(c *gin.Context, namespace string) {
 		Kind:      "Pod",
 		Namespace: pod.Metadata.Namespace,
 		Name:      pod.Metadata.Name,
+		Metadata:  string(metadataJSON),
 		Spec:      string(specJSON),
 		Status:    string(statusJSON),
 		CreatedAt: now,
@@ -267,6 +278,16 @@ func (s *Server) updatePodInNamespace(c *gin.Context, namespace string) {
 	pod.Metadata.UpdatedAt = time.Now()
 	
 	// Convert to storage resource
+	metadataJSON, err := json.Marshal(pod.Metadata)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "SERIALIZATION_ERROR",
+			Message: "Failed to serialize pod metadata",
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+	
 	specJSON, err := json.Marshal(pod.Spec)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -291,6 +312,7 @@ func (s *Server) updatePodInNamespace(c *gin.Context, namespace string) {
 		Kind:      "Pod",
 		Namespace: namespace,
 		Name:      name,
+		Metadata:  string(metadataJSON),
 		Spec:      string(specJSON),
 		Status:    string(statusJSON),
 	}
@@ -404,6 +426,11 @@ func (s *Server) listPodsInNamespace(c *gin.Context, namespace string) {
 
 // resourceToPod converts a storage resource to a Pod
 func (s *Server) resourceToPod(resource storage.Resource) (*types.Pod, error) {
+	var metadata types.ObjectMeta
+	if err := json.Unmarshal([]byte(resource.Metadata), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal pod metadata: %w", err)
+	}
+	
 	var spec types.PodSpec
 	if err := json.Unmarshal([]byte(resource.Spec), &spec); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal pod spec: %w", err)
@@ -419,15 +446,9 @@ func (s *Server) resourceToPod(resource storage.Resource) (*types.Pod, error) {
 	pod := &types.Pod{
 		APIVersion: "v1",
 		Kind:       "Pod",
-		Metadata: types.ObjectMeta{
-			Name:      resource.Name,
-			Namespace: resource.Namespace,
-			UID:       resource.ID,
-			CreatedAt: resource.CreatedAt,
-			UpdatedAt: resource.UpdatedAt,
-		},
-		Spec:   spec,
-		Status: status,
+		Metadata:   metadata,
+		Spec:       spec,
+		Status:     status,
 	}
 	
 	return pod, nil

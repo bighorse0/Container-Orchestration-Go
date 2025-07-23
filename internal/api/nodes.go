@@ -219,8 +219,9 @@ func (s *Server) updateNodeHeartbeat(c *gin.Context) {
 		return
 	}
 	
-	// Update heartbeat in database
-	if err := s.repository.UpdateNodeHeartbeat(name); err != nil {
+	// Get existing node
+	node, err := s.repository.GetNode(name)
+	if err != nil {
 		c.JSON(http.StatusNotFound, ErrorResponse{
 			Error:   "RESOURCE_NOT_FOUND",
 			Message: "Node not found",
@@ -228,6 +229,70 @@ func (s *Server) updateNodeHeartbeat(c *gin.Context) {
 			Details: map[string]string{"error": err.Error()},
 		})
 		return
+	}
+	
+	if node == nil {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error:   "RESOURCE_NOT_FOUND",
+			Message: "Node not found",
+			Code:    http.StatusNotFound,
+		})
+		return
+	}
+	
+	// Parse status update from request body
+	var statusUpdate types.NodeStatus
+	if err := c.ShouldBindJSON(&statusUpdate); err != nil {
+		// If no body provided, just update the heartbeat timestamp
+		if err := s.repository.UpdateNodeHeartbeat(name); err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "DATABASE_ERROR",
+				Message: "Failed to update node heartbeat",
+				Code:    http.StatusInternalServerError,
+				Details: map[string]string{"error": err.Error()},
+			})
+			return
+		}
+	} else {
+		// Update node status with provided data
+		node.Status = statusUpdate
+		
+		// Update Ready condition with current timestamp
+		now := time.Now()
+		readyConditionFound := false
+		
+		for i, condition := range node.Status.Conditions {
+			if condition.Type == "Ready" {
+				node.Status.Conditions[i].LastHeartbeatTime = now
+				node.Status.Conditions[i].Status = "True"
+				node.Status.Conditions[i].Reason = "NodeReady"
+				node.Status.Conditions[i].Message = "Node is ready"
+				readyConditionFound = true
+				break
+			}
+		}
+		
+		if !readyConditionFound {
+			node.Status.Conditions = append(node.Status.Conditions, types.NodeCondition{
+				Type:               "Ready",
+				Status:             "True",
+				LastHeartbeatTime:  now,
+				LastTransitionTime: now,
+				Reason:             "NodeReady",
+				Message:            "Node is ready",
+			})
+		}
+		
+		// Update node in database
+		if err := s.repository.UpdateNode(node); err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "DATABASE_ERROR",
+				Message: "Failed to update node status",
+				Code:    http.StatusInternalServerError,
+				Details: map[string]string{"error": err.Error()},
+			})
+			return
+		}
 	}
 	
 	c.JSON(http.StatusOK, gin.H{
